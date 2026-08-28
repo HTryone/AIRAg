@@ -158,3 +158,4 @@ WorkBuddy 的积分查询接口 `/v2/billing/meter/get-user-resource`：
 | 只存一份凭据 | 切换账号后凭据被覆盖 | 每个账号单独导出一份快照 |
 | 接口 403 继续换参数试 | 浪费时间，拿不到新信息 | 按止损线判定，改走客户端界面 |
 | 找到接口就直接定时跑 | 重复执行出问题 | 写操作先查状态，保证幂等 |
+| 默认入口是 `app.asar` | 改了半天发现代码根本没加载 | 先 `ls resources/` 确认形态：有的 App 已解包，入口是 `launch.js` / `launch.dist.js` 而非 asar（运行时 Hook 见 `Electron 客户端运行时 Hook 与补丁`） |
