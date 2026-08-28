@@ -2,9 +2,22 @@
 
 **结论**：`.bat` 文件正文全部用英文 / ASCII 字符，中文提示交给被调用的 Python 脚本输出。文件里加 `chcp 65001` 只用于让脚本的中文正常显示。
 
-## 为什么
+## 为什么：bat 解析器 和 Python 输出是两回事
 
-Windows 按 ANSI 代码页解析 bat 文件，中文内容会乱码，尤其在非中文系统上。
+Windows 解析 bat 时，是按**当前代码页把字节切成 token** 的。中文是多字节字符，解析器会把它当**命令边界**切开——所以 bat 里直接写中文 `echo` 不只是乱码，**会直接被拆成多条命令报错**：
+
+```
+'的' is not recognized as an internal or external command
+```
+
+关键点：`chcp 65001` 改的是**控制台显示的编码**，改不了 bat 自己被解析的方式。无论怎么设代码页，bat 里写中文都不稳。
+
+而 bat 调用 Python 时，Python 的 `print("中文")` 走的是 **Python 自己的 stdout 管道，不经过 cmd / PowerShell 的 bat 解析器**。所以：
+
+- bat 里写中文 echo → 被解析器切字节 → 报错
+- Python 里 print 中文 → UTF-8 直灌控制台 → 正常（前提是 bat 顶部 `chcp 65001` 让控制台能渲染 UTF-8）
+
+一句话：**bat 别碰中文，中文交给 Python，两边各管各的就不乱。**
 
 ## 怎么做
 
