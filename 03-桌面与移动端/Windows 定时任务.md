@@ -39,7 +39,7 @@
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| 程序或脚本 | `C:\Users\Htryone\.workbuddy\binaries\python\versions\3.13.12\pythonw.exe` | 用 **pythonw** 不是 python，否则每次触发弹黑框 |
+| 程序或脚本 | Python 安装目录下的 `pythonw.exe` 完整路径，如 `C:\Users\<你的用户名>\...\pythonw.exe` | 用 **pythonw** 不是 python，否则每次触发弹黑框。不知道目录：cmd 跑 `where python`，同一目录里把 `python.exe` 换成 `pythonw.exe` |
 | 添加参数 | `D:\xxx\your_script.py` | 脚本完整路径 |
 | **起始于** | `D:\xxx` | 脚本所在目录，**必须填** |
 
@@ -63,8 +63,8 @@
 普通权限即可，不用管理员。整段复制粘贴：
 
 ```powershell
-$pyw = "C:\Users\Htryone\.workbuddy\binaries\python\versions\3.13.12\pythonw.exe"
-$dir = "D:\perca\zidqdworkbuddy\wb-checkin"
+$pyw = "C:\Users\<你的用户名>\...\pythonw.exe"   # 先跑 where.exe python 看 python.exe 在哪，pythonw.exe 在同一目录
+$dir = "<你的项目路径>"
 
 $action   = New-ScheduledTaskAction -Execute $pyw `
               -Argument "$dir\checkin.py" -WorkingDirectory $dir
@@ -86,7 +86,7 @@ Register-ScheduledTask -TaskName "MyDailyTask" `
 
 ```powershell
 schtasks /run /tn MyDailyTask
-Get-Content "D:\perca\zidqdworkbuddy\wb-checkin\logs\checkin.log" -Tail 20
+Get-Content "<你的项目路径>\logs\<你的日志名>.log" -Tail 20
 ```
 
 ---

@@ -20,7 +20,7 @@ PY="C:/Users/xxx/.workbuddy/binaries/python/versions/3.13.12/python.exe"
 直接写全，用系统本来就认得的命令（`python`、`node`、`git` 这些在 PATH 里的）：
 
 ```bash
-cd /d/perca/zidqdworkbuddy/wb-checkin
+cd /d/<你的项目路径>
 python checkin.py --status
 ```
 

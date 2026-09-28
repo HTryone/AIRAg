@@ -27,12 +27,14 @@ Typora 是 Electron 客户端，许可校验在本地完成：RSA 解密 license
 - **关键坑**：`electron-fetch` 在 Electron 里 `useElectronNet=true`，走 `electron.net.request` 而非 `net.fetch`（`:500-504` 注释）。只 Hook `net.fetch` 会漏掉每 12h 续订 → license 被撤销 → 试用期。两个通道都要 Hook，拦截 `/api/client/`。
 - **通用提示**：`electron-fetch` 走 `net.request`、以及 `protocol.handle` 只拦渲染进程，是 Electron 通用事实，所有 App 一致。
 
-## 四、反制二次验证：SLicense 看门狗
+## 四、反制二次验证：看门狗 + 定时器拦截 + IDate 兜底
 
 - 概率性 `2nd` 二次验证：本地纯 JS 验 SLicense 签名，失败 `onUnfillLicense` 清空 `HKCU\Software\Typora\SLicense`（2026-07-23 实测：激活 6 天后触发）。
 - SLicense 值 `RHJlYW1OeWE=#0#1/1/2059`（DreamNya 格式）不是有效 RSA 签名，必失败。
-- 反制：`setInterval(restoreSLicense, 2000)` 每 2s 写回（`:556-576`）。启动先跑一次防首屏空。
-- **通用提示**：本地二次验证失败清注册表是 anti-tamper 通用套路，看门狗恢复通用，换 App 改键名 / 路径。
+- 反制一（7-26）：`restoreSLicense` 看门狗写回，启动先跑一次防首屏空（`:556-576`）；9-10 起周期从 2s 降为 5s（右路不读注册表，2s 纯浪费）。
+- **反制二（9-10，关键）**：`2nd` 由启动后固定 ~530s 的 `setTimeout` 触发，触发前先掷随机数——rand < 0.8 读注册表 → renew → pass；rand > 0.8（约 20%）走**无条件吊销**分支，不读注册表、不看门狗拦得住的内存态照样清。15 个日志样本分界干净：0.7658 及以下全 pass，0.8392 及以上全 unfill。对策：Hook `global.setTimeout` + `require('timers').setTimeout`，拦截启动 120s 内注册的第一个 delay ∈ [520000, 545000] 的定时器（即 2nd 定时器），返回 `_destroyed:true` 假 timer → 2nd 永不触发；同区间后续定时器放行。
+- **反制三（9-10，兜底）**：`refreshIDate()` 启动即刷 + 每 30 分钟把注册表 `IDate` 写成当天（每天只实际写一次），保证漏网时剩余天数显示 15 天而非 0 天。
+- **通用提示**：本地二次验证失败清注册表是 anti-tamper 通用套路；看门狗只保证「下次启动」正常，拦不住运行中的无条件吊销——有概率性吊销分支时必须拦定时器本身（详见通用篇「Electron 客户端运行时 Hook 与补丁」第四节）。换 App 改键名 / delay 区间。
 
 ## 五、激活前清试用数据（Typora 专属路径 / 键名）
 
@@ -48,3 +50,5 @@ Typora 是 Electron 客户端，许可校验在本地完成：RSA 解密 license
 | 7-13 | 又提示 3 天到期 | `electron-fetch` 走 `net.request`，续订绕过 |
 | 7-23 | 运行几天后变试用 | `2nd` 二次验证清 SLicense，无看门狗 |
 | 7-26 | 加 `setInterval` 看门狗 | 恢复 SLicense，稳定 |
+| 9-8 | 运行中弹「试用 0 天」，重启恢复 | `2nd` 约 20% 概率走无条件吊销分支（不读注册表），看门狗拦不住；IDate 固定激活日、超 15 天窗口后吊销算出 0 天 |
+| 9-10 | 拦截 `2nd` 定时器 + IDate 兜底 | 启动 120s 内第一个 delay ∈ [520000, 545000] 的 `setTimeout` 返回假 timer；`refreshIDate()` 每 30 分钟刷 IDate 成当天；看门狗降频 5s |

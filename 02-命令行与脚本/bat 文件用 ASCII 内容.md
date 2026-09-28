@@ -27,7 +27,7 @@ Windows 解析 bat 时，是按**当前代码页把字节切成 token** 的。�
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-"C:\Users\Htryone\.workbuddy\binaries\python\versions\3.13.12\python.exe" checkin.py --status
+"C:\path\to\your\python.exe" checkin.py --status   # 不知道 python 在哪：cmd 跑 where python
 echo.
 pause
 ```
