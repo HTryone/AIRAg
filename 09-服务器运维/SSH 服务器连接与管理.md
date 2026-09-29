@@ -82,6 +82,36 @@ Host hk02
 
 之后 `ssh panel` 就能连。这个文件里的 `Host` 是别名，不是变量，换个窗口照样有效。
 
+### 免交互用密码连（Windows，给自动化用）
+
+需要脚本里跑 `ssh`、又只有密码没有密钥时，可以用 OpenSSH 自带的 askpass 机制。先确认版本够（8.4 起支持 `SSH_ASKPASS_REQUIRE`）：
+
+```bash
+ssh -V
+```
+
+写一个只回显密码的临时脚本 `ap.cmd`：
+
+```bat
+@echo off
+echo <你的密码>
+```
+
+再指定给 `ssh` 并强制启用，就能非交互执行远程命令：
+
+```powershell
+$env:SSH_ASKPASS = "<你的临时脚本路径>\ap.cmd"
+$env:SSH_ASKPASS_REQUIRE = "force"
+$env:DISPLAY = "dummy"
+ssh root@<你的服务器 IP> "cd /var/www && ls"
+```
+
+三个变量缺一不可：`SSH_ASKPASS_REQUIRE=force` 才会在**有终端**的情况下也走 askpass；`DISPLAY` 随便给个值，Windows 版靠它判定图形环境。
+
+实测版本：`OpenSSH_for_Windows_9.5p2`。
+
+**跑完必须毁尸灭迹**：这个脚本里是明文密码，执行完立刻把内容覆盖清空再删文件，别留在临时目录等"定期清理"。
+
 ---
 
 ## 三、加固：挡住暴力破解
@@ -204,5 +234,6 @@ ssh -v root@102.134.50.180
 | 以为装了 fail2ban 就安全了 | 没看 `banned` 数字，实际没生效 | 必须跑 `fail2ban-client status sshd` 看数字 |
 | 只靠密码登录且端口 22 暴露公网 | 长期被扫，迟早被撞开 | 密钥登录 + fail2ban |
 | 卡在 `yes/no` 那步只输 `y` | 连接中断 | 必须完整输 `yes` |
+| askpass 用的密码脚本用完不删 | 明文密码留在磁盘 | 跑完立刻覆盖清空再删文件 |
 
 服务器上的**长期任务**别直接挂在 ssh 窗口里——窗口一断进程就死。用 `nohup cmd &` 或 `tmux`。
