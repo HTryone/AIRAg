@@ -3,7 +3,9 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 echo ============================================
-echo    AIRAg - Generate Overview
+echo    AIRAg - Generate Indexes
+echo    1) 全貌.md  (overview tree)
+echo    2) INDEX.md in every category folder
 echo    (progress and results are printed by Python)
 echo ============================================
 echo(
@@ -18,9 +20,10 @@ if errorlevel 1 goto :failed
 
 echo(
 echo --------------------------------------------
-echo [DONE] Overview generated.
-echo        Output file path is shown above.
-echo        It is auto-generated - do not edit by hand.
+echo [DONE] Overview + sub-indexes generated.
+echo        Output file paths are shown above.
+echo        They are auto-generated - do not edit by hand.
+echo        Maintain the root INDEX.md, then run this again.
 echo --------------------------------------------
 goto :end
 

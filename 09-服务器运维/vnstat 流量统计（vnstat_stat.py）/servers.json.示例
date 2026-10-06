@@ -1,0 +1,39 @@
+{
+  "_怎么用": [
+    "1) 把本文件改名为 servers.json，放在 vnstat_stat.py 同一个目录",
+    "2) 下面 servers 里每台服务器照示例填；要加机器就复制一整个 { ... } 段落",
+    "3) 跑：python vnstat_stat.py --hours 6"
+  ],
+  "_两种登录方式二选一（每台机器只填一种）": {
+    "密钥登录": "填 key_path（私钥文件路径），password 填 null",
+    "密码登录": "key_path 填 null，password 填密码"
+  },
+  "_字段说明": {
+    "name": "报表里显示的名字，随便取（例：JP1、US-机房A）",
+    "host": "<你的服务器 IP 或域名>",
+    "port": "SSH 端口，默认 22；改过端口的填实际值",
+    "auth": "key 或 password —— 只是给人看的标记，脚本实际按 key_path / password 有没有值来判断",
+    "key_path": "私钥文件路径。写绝对路径最省事（例：/c/Users/<你的用户名>/.ssh/id_ed25519）；写相对路径时按『脚本位置上三级』解析",
+    "password": "密码登录时填这里；密钥登录填 null。本文件含密码，别提交进 git"
+  },
+  "servers": [
+    {
+      "_这段是密钥登录示例，照抄后把尖括号内容换成你自己的": "",
+      "name": "<显示名，例：US1>",
+      "host": "<你的服务器 IP 或域名>",
+      "port": 22,
+      "auth": "key",
+      "key_path": "<你的私钥路径，例：/c/Users/<你的用户名>/.ssh/id_ed25519>",
+      "password": null
+    },
+    {
+      "_这段是密码登录示例，照抄后把尖括号内容换成你自己的": "",
+      "name": "<显示名，例：JP1>",
+      "host": "<你的服务器 IP 或域名>",
+      "port": 22,
+      "auth": "password",
+      "key_path": null,
+      "password": "<你的 SSH 密码>"
+    }
+  ]
+}
