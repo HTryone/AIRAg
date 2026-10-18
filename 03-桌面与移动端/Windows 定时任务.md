@@ -126,7 +126,8 @@ schtasks /query /tn MyDailyTask /v /fo list
 `Get-ScheduledTask` 返回的对象里，`Settings.AllowStartIfOnBatteries` 这类字段经常是空的，不是真的没勾。要看真实值必须导出 XML：
 
 ```powershell
-$xml = [xml](Export-ScheduledTask -TaskName "MyDailyTask")
+$task = Export-ScheduledTask -TaskName MyDailyTask
+$xml = [xml]$task
 $ns  = New-Object Xml.XmlNamespaceManager($xml.NameTable)
 $ns.AddNamespace("t", "http://schemas.microsoft.com/windows/2004/02/mit/task")
 $xml.SelectNodes("//t:Settings/*", $ns) | ForEach-Object { "$($_.Name) = $($_.InnerText)" }
@@ -155,3 +156,37 @@ $xml.SelectNodes("//t:Settings/*", $ns) | ForEach-Object { "$($_.Name) = $($_.In
 | 脚本只 print 不写文件 | pythonw 下输出全丢，无从排查 | 日志必须写文件 |
 
 脚本本身要保证**幂等**（重复跑不会有副作用），因为失败重试和错过补跑都会导致一次触发多次执行。
+
+## 八、杀毒软件锁定/删除正在编译的产物
+
+**结论**：本机编译出的可执行文件被安全软件**锁住或删掉**时，现象是「exe 能编译出来，但进程起不来、甚至文件随后消失」，日志**一行都不写**。先确认是哪个进程握着文件，再谈程序本身的 bug。
+
+**实测（2026-10-08）**：一个自研的 DNS 程序（Go 编译、无控制台窗口、监听本地端口、写开机自启），编译成功后：
+
+| 时刻 | 现象 |
+|---|---|
+| 编译完成 | 文件在，启动后无进程、日志不新增 |
+| 立刻读文件 | 报 `The process cannot access the file because it is being used by another process` |
+| 查持有者 | 重启管理器（Restart Manager）报 `PID=... App="卡巴斯基服务"` —— 安全软件服务持有句柄 |
+| 稍后 | 文件被删除，**同目录下的运行数据、配置都还在**；连注册表里的开机自启项也被一并清掉 |
+
+**怎么看是谁锁着文件**（Windows，PowerShell）：
+
+```powershell
+# 用重启管理器列出占用某个文件的进程；把 <文件路径> 换成实际路径
+$p = "<文件路径>"
+$r = [System.Runtime.InteropServices.Marshal]
+# 简化做法：直接看安全软件是否在跑 + 文件句柄能否独占打开
+Get-Process avp, avpui -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
+```
+
+先跑一次「独占打开」测试：打不开 = 有进程占着；`Get-Process` 里又找不到同名程序 = 占的人不是你的程序。
+
+**处置顺序**：
+
+1. **确认副作用清单**：文件之外的残留（配置、数据、注册表自启项）也跟着被清掉了 —— 重建程序后要一并恢复。
+2. **让用户自己在安全软件里加排除**：把**目录**加进排除/受信任，并且勾到「所有保护组件」（文件防护、行为防护/系统监视器、系统扫描分别生效，只加一处仍会被删）。按**文件校验和**加的白名单对**新编译出来的 exe 无效**（哈希变了），必须按路径/目录加。
+3. **重建后立刻验证**：文件在、进程在、日志在写、功能实际通。
+4. 不要由 AI 去改安全软件的设置 —— 那属于用户机器的安全配置。
+
+**反例**：看到「程序起不来」就去改程序代码；或者看到文件被锁就去等 —— 两者都绕开了「谁在锁它」这个唯一有信息量的问题。

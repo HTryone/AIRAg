@@ -9,6 +9,7 @@
 | 模块 | [Electron 客户端逆向.md](Electron 客户端逆向.md) | 解包流程：找 asar → 提取 → 找凭据 → 试接口 → 判定能否脚本化 |
 | 模块 | [Typora 激活脚本运行时 Hook 全记录（launch.dist.js、crypto Hook、net.request、二次验证看门狗）.md](Typora 激活脚本运行时 Hook 全记录（launch.dist.js、crypto Hook、net.request、二次验证看门狗）.md) | Typora 1.13.7/1.14.6 专属：具体值 / 路径 / 键名 / 坑，通用原理见上篇 |
 | 单条 | [安卓 WebView 用 CDP 取证（adb 端口转发）.md](安卓 WebView 用 CDP 取证（adb 端口转发）.md) | 正式包前端日志看不见，转发调试端口后浏览器直调复现 |
+| 单条 | [浏览器扩展的加载、安装性校验与权限.md](浏览器扩展的加载、安装性校验与权限.md) | 改完一个扩展，「能装」不等于「能用」，「图标出来了」也不等于加载成功。装法、校验、权限三件事各有各的坑。 |
 
 ## 备注（历史）
 

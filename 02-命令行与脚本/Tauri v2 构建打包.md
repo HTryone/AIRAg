@@ -289,4 +289,4 @@ npm run tauri android build -- --verbose
 ## 相关
 
 - 路径怎么写：[Git Bash 路径写法](Git%20Bash%20路径写法.md)
-- 打包脚本本身：[bat 文件用 ASCII 内容](bat%20文件用%20ASCII%20内容.md)
+- 打包脚本本身：[稳妥执行任务：文件化脚本与双击入口](稳妥执行任务：文件化脚本与双击入口.md)

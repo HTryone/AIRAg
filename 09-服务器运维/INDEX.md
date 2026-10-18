@@ -16,6 +16,7 @@
 | 单条 | [换机或恢复服务器时参数必须按真机复核.md](换机或恢复服务器时参数必须按真机复核.md) | ZRAM/conntrack/journald 按当前真机内存重算，不照抄旧机器数值 |
 | 单条 | [改生产配置前先备份并停服务.md](改生产配置前先备份并停服务.md) | 改前留备份，停服务 → 覆盖 → 起服务避免写入竞态 |
 | 模块 | [日志与磁盘防撑满 （journald 限容、apt 自动清、旧内核清理）.md](日志与磁盘防撑满 （journald 限容、apt 自动清、旧内核清理）.md) | 小磁盘服务器防日志/缓存/旧内核慢慢撑满盘 |
+| 单条 | [根跑的安装步骤留下 root 属主缓存，队列与定时任务会静默全停.md](根跑的安装步骤留下 root 属主缓存，队列与定时任务会静默全停.md) | 安装脚本里凡是以 root 跑过 composer install / artisan（package:discover、key:generate、migrat |
 | 模块 | [流量监控三件套 （vnstat、iftop、nethogs）.md](流量监控三件套 （vnstat、iftop、nethogs）.md) | 历史统计 + 实时按 IP + 实时按进程，先 vnstat 看历史再 iftop/nethogs 看实时 |
 | 模块 | [证书申请与自动续期.md](证书申请与自动续期.md) | acme.sh：HTTP 验证 / DNS 验证 → 装到 Web 服务器 → 自动续期 → 排查 |
 
