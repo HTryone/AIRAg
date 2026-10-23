@@ -76,6 +76,17 @@ Remove-Item Env:\GIT_ASKPASS -ErrorAction SilentlyContinue
 
 推送后用 `git ls-remote origin main` 对一下本地和远端 commit 是否一致。
 
+## 和 gh.sh 的分工（先看这条，别走错）
+
+| 这件事 | 走哪个 |
+|---|---|
+| 查状态、提 PR / issue、回评论、贴标签、核实 PR、任意 API | **一律走 `GitHub 操作脚本（gh.sh）/gh.sh`**，用法见同文件夹的说明；不许手拼 `curl` |
+| 建**仓库**、`git push`（不是 API 调用） | 本文这套流程（凭据 / 代理 / askpass） |
+
+一句话：**API 类动作用 `gh.sh`；git 传输类动作（建仓、push）用本文流程**。`gh.sh` 的令牌同样来自 `git credential fill`，和本文第 1 步取令牌是一回事。
+
+> 本文第 1 步之所以用 PowerShell + cmd 重定向，是绕开「PowerShell 管道喂 `git credential fill` 取不到」这个坑；**在 Git Bash 里则可以直接用管道**（`gh.sh` 就是这么取令牌的）。
+
 ## 反例（实测踩过的）
 
 | 反例 | 后果 | 正解 |
@@ -87,6 +98,7 @@ Remove-Item Env:\GIT_ASKPASS -ErrorAction SilentlyContinue
 | 令牌拼进命令行参数（如 push URL） | 进程列表/日志泄漏 | askpass 文件或内存变量 |
 | askpass 临时文件用完不删 | 令牌落盘残留 | 当场删除，删完再继续 |
 | 代理端口瞎猜 | 白等超时 | 翻同机已能推送仓库的 `.git/config` |
+| 建仓/推送到处手拼 `curl`、临时另写脚本 | 令牌进命令历史、没有授权门槛、不可复现 | API 动作走 `gh.sh`，本流程只管建仓与 push |
 
 ## 排查姿势
 

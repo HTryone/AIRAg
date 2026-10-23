@@ -17,6 +17,7 @@
 #   bash gh.sh repo-info                      # 当前目录 git 仓库的 owner/name
 #   bash gh.sh verify [--dir <仓库目录>] [--repo owner/name] [--branch main]
 #   bash gh.sh pr-list [--repo owner/name] [--state open|closed|all]
+#   bash gh.sh pr-show <编号> [--repo owner/name] [--files]      # 核实 PR：状态/可合并性/正文全文
 #   bash gh.sh pr-create "<标题>" <正文.md> [--repo owner/name] [--base main]
 #                                            [--head <owner:branch>] [--dry-run] [--yes]
 #   bash gh.sh issue-list [--repo owner/name] [--state open] [--limit 20]
@@ -25,13 +26,16 @@
 #   bash gh.sh issue-comment <编号> <正文.md> [--repo owner/name] [--dry-run] [--yes]
 #   bash gh.sh issue-label <编号> "bug,help wanted" [--repo ...] [--yes]
 #   bash gh.sh issue-close <编号> [--repo ...] [--reason completed|not_planned] [--yes]
-#   bash gh.sh api <GET|POST|PATCH> <path> [payload.json]     # 逃生口，只读用 GET
+#   bash gh.sh api <GET|POST|PATCH|DELETE> <path> [payload.json] [--dry-run] [--yes] [--raw]
+#                                            # 逃生口；GET 随时可用，写操作要 --yes；
+#                                            # 写操作也支持 --dry-run 预演；--raw 不截断输出
 #
 # 通用规则：
 #   * 不写 --repo 时，用「当前目录（或 --dir）所在 git 仓库的 origin」推断 owner/name。
 #   * PR 的 head 默认 = <你的登录名>:<当前分支>；跨仓库 PR 必须写 --head。
 #   * 令牌需要 repo 权限（改 .github/workflows 里的文件还需 workflow 权限）。
-#   * 若 api.github.com 直连不通：设 GH_PROXY（如 export GH_PROXY=socks5h://127.0.0.1:<你的代理端口>）。
+#   * 网络：默认直连 api.github.com；超时/闪断会自动重试（GH_TIMEOUT / GH_RETRIES 可调）。
+#     直连不通时设 GH_PROXY（如 export GH_PROXY=socks5h://127.0.0.1:<你的代理端口>）。
 #   * 凭据从哪来、有哪几个值要你自己填 → 见本文件内「★★★ 用之前先看这里 ★★★」配置区。
 # =============================================================================
 set -uo pipefail
@@ -135,8 +139,20 @@ my_login() {
   printf '%s' "$BODY" | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["login"])'
 }
 
+# 超时与重试：网络闪断/限流不该让人重跑整条命令，更不能无限挂起。
+GH_TIMEOUT="${GH_TIMEOUT:-30}"        # 单次请求超时（秒）
+GH_RETRIES="${GH_RETRIES:-2}"         # 失败后重试次数（仅对网络错误与 5xx 重试）
+
+# 返回 0 = 可重试（网络错误 / 429 / 5xx），1 = 不该重试（4xx 业务错误）
+gh_retryable() {
+  case "$1" in
+    000|429|500|502|503|504) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 gh_api() {
-  local method="$1" path="$2" payload="${3:-}" resp
+  local method="$1" path="$2" payload="${3:-}" resp attempt=0
   local args=(-s -X "$method"
               -H "Authorization: token $TOKEN"
               -H "Accept: application/vnd.github+json"
@@ -144,15 +160,40 @@ gh_api() {
               -w $'\n%{http_code}')
   [ -n "${GH_PROXY:-}" ] && args+=(-x "$GH_PROXY")   # 例：socks5h://127.0.0.1:<你的代理端口>
   [ -n "$payload" ] && args+=(--data-binary "@$payload")
-  resp=$(curl "${args[@]}" "$API$path") || die "curl 失败：$path"
-  HTTP_CODE=$(printf '%s' "$resp" | tail -n1)
-  BODY=$(printf '%s' "$resp" | sed '$d')
+
+  while :; do
+    # --max-time 防无限挂起；--retry 只重试连接层失败与 5xx（幂等安全）
+    resp=$(curl --max-time "$GH_TIMEOUT" --retry "$GH_RETRIES" --retry-delay 2 \
+                --retry-connrefused "${args[@]}" "$API$path") \
+      || resp=$'\n000'
+    HTTP_CODE=$(printf '%s' "$resp" | tail -n1)
+    BODY=$(printf '%s' "$resp" | sed '$d')
+
+    # 000 = curl 连不上/超时；此时给一次显式重试（--retry 对部分失败不生效）
+    if [ "$HTTP_CODE" = "000" ] && [ "$attempt" -lt "$GH_RETRIES" ]; then
+      attempt=$((attempt + 1))
+      info "网络未通（第 $attempt 次重试）：$path" >&2
+      sleep 2
+      continue
+    fi
+    break
+  done
+
+  if [ "$HTTP_CODE" = "000" ]; then
+    die "curl 连不上 $API$path（超时 ${GH_TIMEOUT}s，已重试 ${GH_RETRIES} 次）。若是本机直连不通，设 GH_PROXY=socks5h://127.0.0.1:<代理端口> 再试"
+  fi
 }
 
 show_http_error() {
   printf '✗ HTTP %s\n' "$HTTP_CODE" >&2
-  printf '%s\n' "$BODY" | head -c 600 >&2; printf '\n' >&2
+  # 限流时明确报出还能不能用、什么时候恢复
+  if printf '%s' "$BODY" | grep -q "rate limit"; then
+    local reset; reset=$(printf '%s' "$BODY" | sed -n 's/.*"reset": *\([0-9]*\).*/\1/p' | head -1)
+    [ -n "$reset" ] && info "触发 GitHub 限流，额度恢复时间戳：$reset（用 \`date -d @$reset\` 看本地时间）" >&2
+  fi
+  printf '%s\n' "$BODY" | head -c 800 >&2; printf '\n' >&2
   case "$HTTP_CODE" in
+    000) info "网络不通或超时 → 设 GH_PROXY=socks5h://127.0.0.1:<代理端口> 走代理" >&2 ;;
     401) info "令牌无效/过期 → 清掉凭据管理器里的 github.com 条目后重新登录" >&2 ;;
     403) info "权限不足或被限流 → 令牌需 repo 权限；改 workflow 文件需 workflow 权限" >&2 ;;
     404) info "仓库或编号不存在，或令牌无权访问私有库" >&2 ;;
@@ -218,6 +259,48 @@ if not d: print("（没有 PR）"); raise SystemExit
 for p in d:
     print("#%-6s %-7s %-22s %s" % (p["number"], p["state"], p["head"]["label"][:22], p["title"][:60]))
 '
+}
+
+# 核实单个 PR：状态、合并性、改了哪些文件、正文全文（不截断）
+# 提完 PR 用它自证「真的建出来了、正文没乱码」，而不是只信创建时的回执。
+cmd_pr_show() {
+  local num="${1:-}"; shift || true
+  [ -n "$num" ] || die "用法：pr-show <编号> [--repo owner/name] [--files]"
+  local files=0; parse_common "$@"
+  local a; for a in "${ARGS[@]}"; do case "$a" in --files) files=1 ;; *) die "未知参数：$a" ;; esac; done
+  resolve_repo; load_token
+
+  gh_api GET "/repos/$REPO/pulls/$num"
+  [ "$HTTP_CODE" = "200" ] || { show_http_error; exit 1; }
+  local tmp; tmp=$(mk_temp); printf '%s' "$BODY" >"$tmp"
+  "$PY" - "$tmp" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+print("标题   : %s" % d["title"])
+print("编号   : #%s" % d["number"])
+print("状态   : %s%s" % (d["state"], "（已合并）" if d.get("merged") else ("（已关闭）" if d["state"]=="closed" else "")))
+print("作者   : %s" % d["user"]["login"])
+print("分支   : %s → %s" % (d["head"]["label"], d["base"]["label"]))
+print("可合并 : mergeable=%s  mergeable_state=%s  冲突=%s" % (d.get("mergeable"), d.get("mergeable_state"), d.get("mergeable") is False))
+print("改动   : %s 文件  +%s/-%s" % (d.get("changed_files"), d.get("additions"), d.get("deletions")))
+print("评审   : comments=%s review_comments=%s commits=%s" % (d.get("comments"), d.get("review_comments"), d.get("commits")))
+print("链接   : %s" % d["html_url"])
+print("-" * 70)
+body = d.get("body") or "（正文为空）"
+print(body)
+PYEOF
+  rm -f "$tmp"
+
+  if [ "$files" = "1" ]; then
+    gh_api GET "/repos/$REPO/pulls/$num/files?per_page=100"
+    [ "$HTTP_CODE" = "200" ] || return 0
+    printf -- '--- 改动文件 ---\n'
+    printf '%s' "$BODY" | "$PY" -c '
+import json,sys
+for f in json.load(sys.stdin):
+    print("  %-6s +%-5s -%-5s %s" % (f["status"], f["additions"], f["deletions"], f["filename"]))
+'
+  fi
 }
 
 cmd_pr_create() {
@@ -408,15 +491,55 @@ PYEOF
 # 逃生口：只读用 GET 最安全；POST/PATCH/DELETE 要求 --yes
 cmd_api() {
   local method="${1:-GET}" path="${2:-}"; shift 2 || true
-  local payload="${1:-}" yes=0
-  [ $# -gt 0 ] && shift
-  while [ $# -gt 0 ]; do case "$1" in --yes) yes=1 ;; esac; shift; done
-  [ -n "$path" ] || die "用法：api <GET|POST|PATCH|DELETE> <path> [payload.json] [--yes]"
+  # payload 与标志位都可能出现在第 3 个位置，且顺序不定 → 统一按「是不是 -- 开头」分流，
+  # 不能盲取 $1 当 payload（否则 `api POST <path> --dry-run` 会把 --dry-run 当文件名）。
+  local payload="" yes=0 dry=0 raw=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --yes) yes=1 ;;
+      --dry-run) dry=1 ;;
+      --raw) raw=1 ;;          # 不截断输出（核实长正文时用）
+      --repo) REPO="${2:-}"; shift ;;   # 逃生口也要能指定别的仓库
+      --dir)  DIR="${2:-}";  shift ;;
+      --*) die "未知参数：$1（可用：--repo / --dir / --dry-run / --yes / --raw）" ;;
+      *)
+        [ -n "$payload" ] && die "只接受一个 payload 文件，多给了：$1"
+        payload="$1"
+        ;;
+    esac
+    shift
+  done
+  [ -n "$path" ] || die "用法：api <GET|POST|PATCH|DELETE> <path> [payload.json] [--dry-run] [--yes] [--raw]"
+  [ -n "$payload" ] && [ ! -f "$payload" ] && die "payload 文件不存在：$payload"
+
+  # 预演优先于授权检查：--dry-run 不发出任何请求，本来就不该要 --yes
+  if [ "$dry" = "1" ] && [ "$method" != "GET" ]; then
+    resolve_repo
+    info "仓库=$REPO  $method $path"
+    if [ -n "$payload" ]; then
+      info "--dry-run：将发送以下 payload（未发出，仅预览前 400 字）"
+      head -c 400 "$payload"; printf '\n'
+    else
+      info "--dry-run：无 payload（未发出）"
+    fi
+    return 0
+  fi
+
   [ "$method" = "GET" ] || need_yes "$yes"
+
+  # 逃生口的 path 通常已含 owner/name（如 /repos/o/n/issues），不强制解析仓库；
+  # 但 --repo 给了就解析出来，方便 dry-run 回显与报错定位。
+  [ -n "$REPO" ] && resolve_repo
+
   load_token
   gh_api "$method" "$path" "$payload"
   printf '%s\n' "HTTP $HTTP_CODE"
-  printf '%s\n' "$BODY" | head -c 4000
+  if [ "$raw" = "1" ]; then
+    printf '%s\n' "$BODY"
+  else
+    printf '%s\n' "$BODY" | head -c 4000
+    [ "$(printf '%s' "$BODY" | wc -c | tr -d ' ')" -gt 4000 ] && printf '\n…（已截断，加 --raw 看全文）\n'
+  fi
   printf '\n'
 }
 
@@ -427,6 +550,7 @@ case "$cmd" in
   repo-info)      cmd_repo_info "$@" ;;
   verify)         cmd_verify "$@" ;;
   pr-list)        cmd_pr_list "$@" ;;
+  pr-show)        cmd_pr_show "$@" ;;
   pr-create)      cmd_pr_create "$@" ;;
   issue-list)     cmd_issue_list "$@" ;;
   issue-show)     cmd_issue_show "$@" ;;

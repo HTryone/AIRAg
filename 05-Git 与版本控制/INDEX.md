@@ -16,9 +16,10 @@
 
 | 类型 | 文件 | 一句话 |
 |---|---|---|
-| 模块 | [GitHub 操作脚本（gh.sh）.md](GitHub 操作脚本（gh.sh）/GitHub 操作脚本（gh.sh）.md) | 一个脚本包办取令牌 / 查状态 / 提 PR / 建 issue / 贴标签；写操作必须用户授权 + `--yes`（一个工具一个文件夹：脚本 + 用法参考都在文件夹里） |
+| 模块 | [GitHub 操作脚本（gh.sh）.md](GitHub 操作脚本（gh.sh）/GitHub 操作脚本（gh.sh）.md) | **GitHub 动作一律走本脚本、用前先读说明**：取令牌 / 查状态 / 提 PR / 核实 PR / 建 issue / 贴标签 / `api` 逃生口；写操作必须用户授权 + `--yes`；脚本与说明成对同放一个文件夹，两份副本须字节一致 |
 | 附件 | [gh.sh](GitHub 操作脚本（gh.sh）/gh.sh) | 脚本 / 模板（不计入条目数） |
 
 ## 备注（历史）
 
 2026-10-05 新增 Windows 非交互推 GitHub 全流程（建仓、取凭据、代理、askpass）（模块）：MCP 建仓 403、PowerShell 管道喂 credential fill 失败、Git Bash curl TLS 坏、helper-selector 非交互静默 exit 128、askpass 临时注入用完即删。2026-10-06 **并入**通用 GitHub 操作脚本（一个工具一个文件夹 `GitHub 操作脚本（gh.sh）/`：内含 `gh.sh` + 用法参考；脚本顶部带「用之前先看这里」配置区：凭据来源 + 四个占位参数）；该内容原拟新建顶层目录，按用户要求并入本目录
+2026-10-24 用工作区最新版**整体替换**库内 `gh.sh`（439 → 563 行，两边 sha256 相同）：补上 `pr-show`、`api` 的 `--dry-run`/`--raw`/`--repo`、超时与重试（`GH_TIMEOUT`/`GH_RETRIES`）、限流恢复时间提示；同篇说明重写为「硬规矩：走脚本 + 读说明、脚本与说明成对、两份副本怎么同步与校验、实测记录」。
