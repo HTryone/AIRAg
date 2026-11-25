@@ -7,6 +7,7 @@
 |---|---|---|
 | 模块 | [Electron 客户端运行时 Hook 与补丁.md](Electron 客户端运行时 Hook 与补丁.md) | 注入入口 → Hook 加密原语 / 网络双通道 / 反制二次验证（通用手法总览） |
 | 模块 | [Electron 客户端逆向.md](Electron 客户端逆向.md) | 解包流程：找 asar → 提取 → 找凭据 → 试接口 → 判定能否脚本化 |
+| 单条 | [IDM 冻结后改用常驻守护进程补锁（拆分激活与守护两个 exe）.md](IDM 冻结后改用常驻守护进程补锁（拆分激活与守护两个 exe）.md) | 锁死 CLSID 键后，IDM 自动更新会重写该键权限（锁失效），需要一个长期在跑的守护去补锁。不要用 schtasks 计划任务——改用「开机启动文件夹放一个 |
 | 单条 | [IDM 冻结后用计划任务自动补锁实现长期免维护.md](IDM 冻结后用计划任务自动补锁实现长期免维护.md) | 锁死 CLSID 键后 IDM 虽然一直正常，但 IDM 自动更新会重写该键的权限（锁失效），所以要用 Windows 计划任务定期重新补锁。用 schtask |
 | 单条 | [IDM 试用冻结：锁死 CLSID 的 Model 键才是判定依据.md](IDM 试用冻结：锁死 CLSID 的 Model 键才是判定依据.md) | IDM（6.43 实测）判定「试用是否过期」看的是 HKCU\Software\Classes\WOW6432Node\CLSID\{07999AC3-058B |
 | 模块 | [Typora 激活脚本运行时 Hook 全记录（launch.dist.js、crypto Hook、net.request、二次验证看门狗）.md](Typora 激活脚本运行时 Hook 全记录（launch.dist.js、crypto Hook、net.request、二次验证看门狗）.md) | Typora 1.13.7/1.14.6 专属：具体值 / 路径 / 键名 / 坑，通用原理见上篇 |
